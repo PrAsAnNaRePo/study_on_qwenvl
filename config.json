@@ -1,0 +1,15 @@
+{
+    "llm_id": "Qwen/Qwen2-VL-2B-Instruct",
+    "data": {
+        "max_len": 55,
+        "dataset": "textcap",
+        "batch_size": 4,
+        "num_workers": 4
+    },
+    "training": {
+        "lr": 2e-4,
+        "warmup_steps": 200,
+        "epochs": 3,
+        "logging_steps": 100
+    }
+}
