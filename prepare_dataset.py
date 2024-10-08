@@ -12,7 +12,7 @@ class QwenDataset(Dataset):
         self.processor = processor
         print("Loading data...")
 
-        self.dataset = HDataset.from_json("/workspace/data.json")
+        self.dataset = HDataset.from_json("/workspace/study_on_qwenvl/data.json")
         self.processed_data = self.preprocess_dataset()
 
     def preprocess_dataset(self):
@@ -34,11 +34,17 @@ class QwenDataset(Dataset):
                 # truncation=True
             )
 
+            targets = inputs['input_ids'].masked_fill(inputs['input_ids'] == 151655, -100)
+            
+            with open('log.txt', 'w') as f:
+                f.write(f"{text_prompt}\n\n{inputs['input_ids'].tolist()}\n\n{targets.tolist()}")
+            
             processed_data.append({
                 "input_ids": inputs['input_ids'],
                 "pixel_values": inputs["pixel_values"],
                 'attention_mask': inputs['attention_mask'],
-                "image_grid_thw": inputs['image_grid_thw']
+                "image_grid_thw": inputs['image_grid_thw'],
+                "targets": targets
             })
 
         return processed_data
@@ -90,8 +96,10 @@ data = {
     "input_ids": ds[0]['input_ids'].cuda(),
     "attention_mask": ds[0]['attention_mask'].cuda(),
     "pixel_values": ds[0]['pixel_values'].cuda(),
-    'image_grid_thw': ds[0]['image_grid_thw'].cuda()
+    'image_grid_thw': ds[0]['image_grid_thw'].cuda(),
+    "labels": ds[0]['targets']
 }
 
-with torch.cuda.amp.autocast_mode.autocast():
+with torch.cuda.amp.autocast_mode.autocast(dtype=torch.bfloat16):
     out = model(**data)
+    print(out)
