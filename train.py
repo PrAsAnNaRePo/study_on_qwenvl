@@ -11,13 +11,19 @@ from io import BytesIO
 from base64 import b64decode
 import numpy as np
 from datasets import load_dataset, concatenate_datasets
-from prepare_dataset import QwenDataset
+# from prepare_dataset import QwenDataset
+from pre_dataset2 import QwenDataset, collate_fn
 from transformers import Qwen2VLForConditionalGeneration, AutoTokenizer, AutoProcessor
+from functools import partial
 
 def add_argument():
 
     parser=argparse.ArgumentParser()
 
+    parser.add_argument("--model_id", type=str, default="Qwen/Qwen2-VL-2B-Instruct")
+    parser.add_argument("--max_len", type=int, default=5_000)
+    parser.add_argument("--data_path", type=str, default="./data.json")
+    parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--ds_config", default=None)
     parser.add_argument("--local_rank", type=int, default=0)
     
@@ -31,24 +37,26 @@ def add_argument():
 
 def initialize(args,
                model,
+               processor,
                optimizer=None,
                parameters=None,
                training_data=None,
                ):
     parameters = filter(lambda p: p.requires_grad, model.parameters()) if parameters is None else parameters
     
-    model_engine, optimizer, trainloader, _ = deepspeed.initialize(args=args, model=model, model_parameters=parameters, training_data=training_data)
+    model_engine, optimizer, trainloader, _ = deepspeed.initialize(args=args, model=model, model_parameters=parameters, training_data=training_data, collate_fn=partial(collate_fn, processor=processor, max_len=args.max_len))
     return model_engine, optimizer, trainloader
 
 def train(args, model_engine, train_loader):
     # Training loop.
-    for epoch in range(args.training.epochs):
+    for epoch in range(args.epochs):
         loop = tqdm(train_loader, leave=False)
         for batch_idx, batch in enumerate(loop):
-            pixels = batch[0].reshape(-1, 1, 3, 224, 224).to(model_engine.local_rank)
-            input_ids = batch[1].reshape(-1, args.data.max_len).to(model_engine.local_rank)
+            inputs, labels = batch
+            inputs = inputs.to(model_engine.local_rank)
+            labels = labels.to(model_engine.local_rank)
 
-            loss = model_engine(input_ids, pixels, True).loss
+            loss = model_engine(**inputs, labels=labels).loss
             model_engine.backward(loss)
             model_engine.step()
         model_engine.save_checkpoint(f"checkpoints")
@@ -56,26 +64,23 @@ def train(args, model_engine, train_loader):
 def main():
     args = add_argument()
     
-    config_file = 'config.json'
-    with open(config_file) as f:
-        config = DotMap(json.load(f))
-    
     model = Qwen2VLForConditionalGeneration.from_pretrained(
-        config.llm_id,
+        args.model_id,
         torch_dtype=torch.bfloat16,
         attn_implementation="flash_attention_2",
-        device_map="auto",
+        device_map="cpu",
     )
 
-    processor = AutoProcessor.from_pretrained(config.llm_id)
-    training_data = QwenDataset(processor)
+    processor = AutoProcessor.from_pretrained(args.model_id)
+    training_data = QwenDataset(args.data_path)
 
     model_engine, optimizer, train_loader = initialize(
         args=args,
         model=model,
+        processor=processor,
         training_data=training_data,
     )
-    train(config, model_engine, train_loader)
+    train(args, model_engine, train_loader)
 
 if __name__ == "__main__":
     main()
