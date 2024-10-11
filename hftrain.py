@@ -1,19 +1,18 @@
 from dataclasses import dataclass, field
-import json
-import math
-import logging
 import os
-from typing import Any, Dict, Optional, List, Tuple, Union
+from typing import Optional
 import torch
 from torch import nn
-from torch.utils.data import DataLoader, Dataset
-from pre_dataset2 import QwenDataset, collate_fn, partial
+import transformers
+from transformers import Trainer
+from transformers.trainer_pt_utils import LabelSmoother
+from transformers import DataCollatorWithPadding
+from transformers import HfArgumentParser, TrainingArguments
+from accelerate.utils import DistributedType
+from pre_dataset2 import QwenDataset, partial
 from deepspeed import zero
 from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
-import transformers
-from transformers import Trainer, deepspeed
-from transformers.trainer_pt_utils import LabelSmoother
-from accelerate.utils import DistributedType
+from accelerate import Accelerator
 
 IGNORE_TOKEN_ID = LabelSmoother.ignore_index
 
@@ -21,10 +20,9 @@ IGNORE_TOKEN_ID = LabelSmoother.ignore_index
 class ModelArguments:
     model_id: Optional[str] = field(default="Qwen/Qwen2-VL-2B-Instruct")
 
-
 @dataclass
 class DataArguments:
-    dataset_path: str = field(
+    data_path: str = field(
         default="./data.json", metadata={"help": "Path to the training data."}
     )
     max_len: int = field(
@@ -32,10 +30,11 @@ class DataArguments:
     )
 
 @dataclass
-class TrainingArguments(transformers.TrainingArguments):
+class CustomTrainingArguments(TrainingArguments):
+    num_train_epochs: int = field(default=7)
     cache_dir: Optional[str] = field(default=None)
     optim: str = field(default="adamw_torch")
-
+    deepspeed_config: Optional[str] = field(default=None, metadata={"help": "Path to DeepSpeed config file."})
 
 def maybe_zero_3(param):
     if hasattr(param, "ds_id"):
@@ -46,43 +45,29 @@ def maybe_zero_3(param):
         param = param.detach().cpu().clone()
     return param
 
-local_rank = None
-
-def rank0_print(*args):
+def rank0_print(local_rank, *args):
     if local_rank == 0:
         print(*args)
 
-def safe_save_model_for_hf_trainer(trainer: transformers.Trainer, output_dir: str, bias="none"):
+def safe_save_model_for_hf_trainer(trainer: Trainer, output_dir: str):
     """Collects the state dict and dump to disk."""
-    # check if zero3 mode enabled
-    if deepspeed.is_deepspeed_zero3_enabled():
-        state_dict = trainer.model_wrapped._zero3_consolidated_16bit_state_dict()
-    else:
-        state_dict = trainer.model.state_dict()
+    state_dict = trainer.model_wrapped._zero3_consolidated_16bit_state_dict() if trainer.is_deepspeed_enabled else trainer.model.state_dict()
     if trainer.args.should_save and trainer.args.local_rank == 0:
         trainer._save(output_dir, state_dict=state_dict)
 
 class QwenTrainer(Trainer):
-    def compute_loss(self, model, inputs, labels, return_outputs=False):
-        outputs = model(**inputs, label=labels)
+    def compute_loss(self, model, inputs, return_outputs=False):
+        outputs = model(**inputs)
         loss = outputs.loss
         return (loss, outputs) if return_outputs else loss
 
-     
 def train():
-    global local_rank
+    parser = HfArgumentParser((ModelArguments, DataArguments, CustomTrainingArguments))
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    parser = transformers.HfArgumentParser(
-        (ModelArguments, DataArguments, TrainingArguments)
-    )
-    (
-        model_args,
-        data_args,
-        training_args,
-    ) = parser.parse_args_into_dataclasses()
-
-    if getattr(training_args, 'deepspeed', None):
-        training_args.distributed_state.distributed_type = DistributedType.DEEPSPEED
+    if training_args.deepspeed_config:
+        training_args.deepspeed = training_args.deepspeed_config
+        # training_args.distributed_state.distributed_type = DistributedType.DEEPSPEED
 
     compute_dtype = (
         torch.float16
@@ -92,21 +77,25 @@ def train():
 
     local_rank = training_args.local_rank
 
-    device_map = None
-    world_size = int(os.environ.get("WORLD_SIZE", 1))
-    ddp = world_size != 1
+    model = transformers.Qwen2VLForConditionalGeneration.from_pretrained(
+        model_args.model_id,
+        torch_dtype=compute_dtype,
+        device_map="auto",
+    )
+    processor = transformers.AutoProcessor.from_pretrained(model_args.model_id)
+    train_set = QwenDataset(data_args.data_path)
+    data_collator = DataCollatorWithPadding(
+        tokenizer=processor.tokenizer, max_length=data_args.max_len
+    )
 
-    model = Vamos(config=config)
-    train_set = LLavaDataset(
-        model.processor,
-        model.tokenizer,
-        **data_args.__dict__,
-    )
-    
+
     trainer = QwenTrainer(
-        model=model, args=training_args, train_dataset=train_set, process=
+        model=model,
+        args=training_args,
+        train_dataset=train_set,
+        data_collator=data_collator
     )
-    trainer.train(resume_from_checkpoint=True if training_args.resume_from_checkpoint else None)
+    trainer.train()
     trainer.save_state()
 
     safe_save_model_for_hf_trainer(trainer=trainer, output_dir=training_args.output_dir)

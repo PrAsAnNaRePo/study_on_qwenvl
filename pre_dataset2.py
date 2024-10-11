@@ -62,15 +62,24 @@ def collate_fn(batch, processor, max_len):
     texts = [processor.apply_chat_template(msg, tokenize=False, add_generation_prompt=False) for msg in messages]
     image_inputs, video_inputs = process_vision_info(messages)
     
-    inputs = processor(
-        text=texts,
-        images=image_inputs,
-        videos=video_inputs,
-        padding="max_length",
-        return_tensors="pt",
-        max_length=max_len,
-        truncation=True
-    )
+    if max_len == -1:
+        inputs = processor(
+            text=texts,
+            images=image_inputs,
+            videos=video_inputs,
+            padding=True,
+            return_tensors="pt",
+        )
+    else:
+        inputs = processor(
+            text=texts,
+            images=image_inputs,
+            videos=video_inputs,
+            padding="max_length",
+            return_tensors="pt",
+            max_length=max_len,
+            truncation=True
+        )
 
     # inputs = inputs.to(device)
 

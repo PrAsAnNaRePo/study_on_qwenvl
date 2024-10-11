@@ -3,14 +3,12 @@ import json
 import deepspeed
 import requests
 from PIL import Image
-from dotmap import DotMap
 from tqdm import tqdm
 from PIL import Image
 import torch
 from io import BytesIO
 from base64 import b64decode
 import numpy as np
-from datasets import load_dataset, concatenate_datasets
 # from prepare_dataset import QwenDataset
 from pre_dataset2 import QwenDataset, collate_fn
 from transformers import Qwen2VLForConditionalGeneration, AutoTokenizer, AutoProcessor
@@ -64,12 +62,19 @@ def train(args, model_engine, train_loader):
 def main():
     args = add_argument()
     
+    # model = Qwen2VLForConditionalGeneration.from_pretrained(
+    #     args.model_id,
+    #     torch_dtype=torch.bfloat16,
+    #     attn_implementation="flash_attention_2",
+    #     device_map="cpu",
+    # )
     model = Qwen2VLForConditionalGeneration.from_pretrained(
         args.model_id,
-        torch_dtype=torch.bfloat16,
-        attn_implementation="flash_attention_2",
-        device_map="cpu",
+        low_cpu_mem_usage=True,
+        trust_remote_code=True,
     )
+    model.gradient_checkpointing_enable()
+    model.config.use_cache = False
 
     processor = AutoProcessor.from_pretrained(args.model_id)
     training_data = QwenDataset(args.data_path)
