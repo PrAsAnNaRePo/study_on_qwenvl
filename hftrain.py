@@ -8,12 +8,12 @@ from transformers import Trainer
 from transformers.trainer_pt_utils import LabelSmoother
 from transformers import DataCollatorWithPadding
 from transformers import HfArgumentParser, TrainingArguments
-from accelerate.utils import DistributedType
-from pre_dataset2 import QwenDataset, partial
+# from accelerate.utils import DistributedType
+from pre_dataset2 import QwenDataset, partial, collate_fn
 from deepspeed import zero
 from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
-from accelerate import Accelerator
-
+# from accelerate import Accelerator
+from torch.utils.data import DataLoader
 IGNORE_TOKEN_ID = LabelSmoother.ignore_index
 
 @dataclass
@@ -56,15 +56,37 @@ def safe_save_model_for_hf_trainer(trainer: Trainer, output_dir: str):
         trainer._save(output_dir, state_dict=state_dict)
 
 class QwenTrainer(Trainer):
+    def __init__(self, *args, processor=None, data_args=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.processor = processor
+        self.data_args = data_args  # Store data_args as an instance attribute
+
     def compute_loss(self, model, inputs, return_outputs=False):
-        outputs = model(**inputs)
+        inputs, labels = inputs
+        outputs = model(**inputs, labels=labels)
         loss = outputs.loss
         return (loss, outputs) if return_outputs else loss
+
+    def get_train_dataloader(self) -> DataLoader:
+        return DataLoader(
+            dataset=self.train_dataset,
+            batch_size=self.args.per_device_train_batch_size,
+            collate_fn=partial(
+                collate_fn,
+                processor=self.processor,
+                max_len=self.data_args.max_len  # Use self.data_args.max_len here
+            ),
+            shuffle=True,
+            num_workers=self.args.dataloader_num_workers,
+            pin_memory=True
+        )
 
 def train():
     parser = HfArgumentParser((ModelArguments, DataArguments, CustomTrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
-
+    
+    # accelerator = Accelerator()
+    
     if training_args.deepspeed_config:
         training_args.deepspeed = training_args.deepspeed_config
         # training_args.distributed_state.distributed_type = DistributedType.DEEPSPEED
@@ -80,21 +102,23 @@ def train():
     model = transformers.Qwen2VLForConditionalGeneration.from_pretrained(
         model_args.model_id,
         torch_dtype=compute_dtype,
-        device_map="auto",
     )
+
+    model.gradient_checkpointing_enable()
+    model.config.use_cache = False
+
     processor = transformers.AutoProcessor.from_pretrained(model_args.model_id)
+
     train_set = QwenDataset(data_args.data_path)
-    data_collator = DataCollatorWithPadding(
-        tokenizer=processor.tokenizer, max_length=data_args.max_len
-    )
-
-
+    
     trainer = QwenTrainer(
         model=model,
         args=training_args,
         train_dataset=train_set,
-        data_collator=data_collator
+        processor=processor,
+        data_args=data_args,
     )
+
     trainer.train()
     trainer.save_state()
 
