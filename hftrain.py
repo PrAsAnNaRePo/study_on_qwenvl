@@ -61,7 +61,7 @@ class QwenTrainer(Trainer):
         self.processor = processor
         self.data_args = data_args  # Store data_args as an instance attribute
 
-    def compute_loss(self, model, inputs, return_outputs=False):
+    def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
         inputs, labels = inputs
         outputs = model(**inputs, labels=labels)
         loss = outputs.loss

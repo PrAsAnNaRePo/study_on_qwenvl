@@ -1,11 +1,11 @@
 #!/bin/bash
 
 NUM_GPUS=2  # Set this to the number of GPUs you have
-BATCH_SIZE=1  # Adjust based on your GPU memory
+BATCH_SIZE=2  # Adjust based on your GPU memory
 OUTPUT_DIR=./output
 NUM_EPOCHS=7
 DATA_PATH=./data.json
-MAX_LEN=1024
+MAX_LEN=2000
 MODEL_ID=Qwen/Qwen2-VL-2B-Instruct
 
 deepspeed --num_gpus=$NUM_GPUS hftrain.py \
