@@ -6,14 +6,12 @@ from torch import nn
 import transformers
 from transformers import Trainer
 from transformers.trainer_pt_utils import LabelSmoother
-from transformers import DataCollatorWithPadding
 from transformers import HfArgumentParser, TrainingArguments
-# from accelerate.utils import DistributedType
 from pre_dataset2 import QwenDataset, partial, collate_fn
 from deepspeed import zero
 from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
-# from accelerate import Accelerator
 from torch.utils.data import DataLoader
+
 IGNORE_TOKEN_ID = LabelSmoother.ignore_index
 
 @dataclass

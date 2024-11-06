@@ -1,14 +1,7 @@
-from PIL import Image
-from io import BytesIO
-from base64 import b64decode
 from datasets import Dataset as HDataset
-from torch.utils.data import Dataset, DataLoader
-from transformers import Qwen2VLForConditionalGeneration, AutoTokenizer, AutoProcessor
+from torch.utils.data import Dataset
 import torch
-from tqdm import tqdm
-import json
 from qwen_vl_utils import process_vision_info
-from functools import partial
 
 class QwenDataset(Dataset):
     def __init__(self, data_path):
@@ -95,15 +88,3 @@ def collate_fn(batch, processor, max_len):
 
     labels_ids = torch.tensor(labels_list, dtype=torch.int64)
     return inputs, labels_ids
-
-# processor = AutoProcessor.from_pretrained("Qwen/Qwen2-VL-2B-Instruct", min_pixels=256*28*28, max_pixels=512*28*28, padding_side="right")
-# dataset = QwenDataset("/workspace/study_on_qwenvl/data.json")
-
-# print(len(dataset))
-
-# train_loader = DataLoader(
-#     dataset,
-#     batch_size=1,
-#     collate_fn=partial(collate_fn, processor=processor, device="cuda")
-# )
-
