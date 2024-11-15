@@ -7,7 +7,8 @@ import transformers
 from transformers import Trainer
 from transformers.trainer_pt_utils import LabelSmoother
 from transformers import HfArgumentParser, TrainingArguments
-from pre_dataset2 import QwenDataset, partial, collate_fn
+from pre_dataset2 import QwenDataset, collate_fn
+from functools import partial
 from deepspeed import zero
 from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
 from torch.utils.data import DataLoader
