@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 from functools import partial
 
 processor = AutoProcessor.from_pretrained("Qwen/Qwen2-VL-2B-Instruct", min_pixels=256*28*28, max_pixels=512*28*28, padding_side="right")
-dataset = QwenDataset("./data.json")
+dataset = QwenDataset("./table-extraction.json")
 
 print(len(dataset))
 
