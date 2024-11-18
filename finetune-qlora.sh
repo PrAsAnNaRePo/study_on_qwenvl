@@ -8,10 +8,11 @@ NODE_RANK=0
 MASTER_ADDR=localhost
 MASTER_PORT=6001
 
-MODEL="Qwen/Qwen-VL-Chat" #"Qwen/Qwen-VL-Chat"/"Qwen/Qwen-VL" # Set the path if you do not want to load from huggingface directly
+MODEL="Qwen/Qwen-VL-Chat-Int4" # Qwen/Qwen-VL-Chat-Int4 Set the path if you do not want to load from huggingface directly
 # ATTENTION: specify the path to your training data, which should be a json file consisting of a list of conversations.
 # See the section for finetuning in README for more information.
 DATA="ft-data.json"
+
 
 DISTRIBUTED_ARGS="
     --nproc_per_node $GPUS_PER_NODE \
@@ -21,6 +22,7 @@ DISTRIBUTED_ARGS="
     --master_port $MASTER_PORT
 "
 
+# Remember to use --fp16 instead of --bf16 due to autogptq
 torchrun $DISTRIBUTED_ARGS qwen_ft.py \
     --model_name_or_path $MODEL \
     --data_path $DATA \
@@ -28,9 +30,9 @@ torchrun $DISTRIBUTED_ARGS qwen_ft.py \
     --fix_vit True \
     --output_dir output_qwen \
     --num_train_epochs 5 \
-    --per_device_train_batch_size 1 \
+    --per_device_train_batch_size 2 \
     --per_device_eval_batch_size 1 \
-    --gradient_accumulation_steps 16 \
+    --gradient_accumulation_steps 8 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
     --save_steps 1000 \
@@ -43,6 +45,8 @@ torchrun $DISTRIBUTED_ARGS qwen_ft.py \
     --logging_steps 1 \
     --report_to "none" \
     --model_max_length 2048 \
-    --gradient_checkpointing True \
     --lazy_preprocess True \
-    --deepspeed ds_config_zero3.json
+    --use_lora \
+    --q_lora \
+    --gradient_checkpointing \
+    --deepspeed ds_config_zero2.json
