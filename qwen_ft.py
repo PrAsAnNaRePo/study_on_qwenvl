@@ -150,8 +150,14 @@ def preprocess(
         assert len(input_id) == len(target)
         for j, sentence in enumerate(source):
             role = roles[sentence["from"]]
-            _input_id = tokenizer(role).input_ids + nl_tokens + \
-                tokenizer(sentence["value"]).input_ids + [im_end] + nl_tokens
+            # if 'user' in role:
+            #     with open('logs.txt', 'a') as f:
+            #         f.write(str(sentence["value"]) + '\n\n\n')
+            _input_id = tokenizer(role).input_ids + nl_tokens
+            try:
+                _input_id += tokenizer(sentence["value"]).input_ids + [im_end] + nl_tokens
+            except:
+                print(sentence["value"])
             input_id += _input_id
             if role == '<|im_start|>user':
                 _target = [im_start] + [IGNORE_TOKEN_ID] * (len(_input_id)-3) + [im_end] + nl_tokens

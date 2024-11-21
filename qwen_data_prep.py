@@ -90,6 +90,8 @@ randomized_user_prompt = [
 
 qwen_data = []
 
+data_idx = 0
+
 for i in tqdm(range(len(data['time']))):
 
     time = data['time'][i]
@@ -103,20 +105,22 @@ for i in tqdm(range(len(data['time']))):
 
     user_query = random.choice(randomized_user_prompt) + ' <img>' + os.path.join(IMAGE_DIR, f"{file_name}-{page_num}-{i}.png") + '</img>'
     response = data['response'][i].strip()
-
-    qwen_data.append({
-        "id": f"identity_{i}",
-        "conversations": [
-            {
-                "from": "user",
-                "value": user_query
-            },
-            {
-                "from": "assistant",
-                "value": response
-            }
-        ]
-    })
+    
+    if '<img' not in response:
+      qwen_data.append({
+          "id": f"identity_{data_idx}",
+          "conversations": [
+              {
+                  "from": "user",
+                  "value": user_query
+              },
+              {
+                  "from": "assistant",
+                  "value": response
+              }
+          ]
+      })
+      data_idx += 1
 
 print(qwen_data[0])
 print(len(qwen_data))

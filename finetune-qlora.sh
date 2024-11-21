@@ -2,7 +2,7 @@
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 DIR=`pwd`
 
-GPUS_PER_NODE=2
+GPUS_PER_NODE=1
 NNODES=1
 NODE_RANK=0
 MASTER_ADDR=localhost
@@ -26,11 +26,11 @@ DISTRIBUTED_ARGS="
 torchrun $DISTRIBUTED_ARGS qwen_ft.py \
     --model_name_or_path $MODEL \
     --data_path $DATA \
-    --fp16 True \
+    --bf16 True \
     --fix_vit True \
     --output_dir output_qwen \
     --num_train_epochs 5 \
-    --per_device_train_batch_size 2 \
+    --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 1 \
     --gradient_accumulation_steps 8 \
     --evaluation_strategy "no" \
@@ -44,7 +44,7 @@ torchrun $DISTRIBUTED_ARGS qwen_ft.py \
     --lr_scheduler_type "cosine" \
     --logging_steps 1 \
     --report_to "none" \
-    --model_max_length 2048 \
+    --model_max_length 3000 \
     --lazy_preprocess True \
     --use_lora \
     --q_lora \
