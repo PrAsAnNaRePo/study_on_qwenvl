@@ -17,6 +17,7 @@ from transformers.integrations import deepspeed
 from transformers.trainer_pt_utils import LabelSmoother
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from accelerate.utils import DistributedType
+from transformers import AutoProcessor
 
 IGNORE_TOKEN_ID = LabelSmoother.ignore_index
 
@@ -130,8 +131,8 @@ def preprocess(
 ) -> Dict:
     roles = {"user": "<|im_start|>user", "assistant": "<|im_start|>assistant"}
 
-    im_start = tokenizer.im_start_id
-    im_end = tokenizer.im_end_id
+    im_start = tokenizer('<|im_start|>')['input_ids'][0]
+    im_end = tokenizer('<|im_end|>')['input_ids'][0]
     nl_tokens = tokenizer('\n').input_ids
     _system = tokenizer('system').input_ids + nl_tokens
     _user = tokenizer('user').input_ids + nl_tokens
@@ -302,7 +303,7 @@ def train():
     config.use_cache = False
 
     # Load model and tokenizer
-    model = transformers.AutoModelForCausalLM.from_pretrained(
+    model = transformers.Qwen2VLForConditionalGeneration.from_pretrained(
         model_args.model_name_or_path,
         config=config,
         cache_dir=training_args.cache_dir,
@@ -320,6 +321,11 @@ def train():
             model.transformer.visual.requires_grad_(False)
             if hasattr(model.transformer.visual,'attn_pool'):
                 model.transformer.visual.attn_pool.requires_grad_(True)
+
+    proc = AutoProcessor.from_pretrained(
+        model_args.model_name_or_path
+    )
+
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
@@ -328,7 +334,7 @@ def train():
         use_fast=False,
         trust_remote_code=True,
     )
-    tokenizer.pad_token_id = tokenizer.eod_id
+    # tokenizer.pad_token_id = tokenizer.eod_id
 
     if training_args.use_lora:
         if lora_args.q_lora or "chat" in model_args.model_name_or_path.lower():
