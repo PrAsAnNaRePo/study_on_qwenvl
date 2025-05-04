@@ -1,2 +1,7 @@
-__pycache__
-/images
+*.json
+!ds_config*.json
+!zero*.json
+
+images
+
+*.png

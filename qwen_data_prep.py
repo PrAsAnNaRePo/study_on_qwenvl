@@ -65,17 +65,17 @@ from io import BytesIO
 from base64 import b64decode
 import random
 
-FILE_PATH = "data.json"
+FILE_PATH = "adeos-2562.json"
 IMAGE_DIR = "images"
 
 if not os.path.exists(IMAGE_DIR):
     os.makedirs(IMAGE_DIR)
 
 # load the dataset we have
-with open("./data.json", "r") as f:
+with open(FILE_PATH, "r") as f:
     data = json.load(f)
 
-print(data.keys()) # dict_keys(['time', 'file_name', 'page_num', 'image', 'response'])
+print(data[0].keys()) # dict_keys(['time', 'file_name', 'page_num', 'table_num', 'image', 'response'])
 
 randomized_user_prompt = [
     "Please extract the table from this image",
@@ -92,19 +92,19 @@ qwen_data = []
 
 data_idx = 0
 
-for i in tqdm(range(len(data['time']))):
+for i in tqdm(range(len(data))):
 
-    time = data['time'][i]
-    file_name = data['file_name'][i]
-    page_num = data['page_num'][i]
+    time = data[i]['time']
+    file_name = data[i]['file_name']
+    page_num = data[i]['page_num']
 
     # save the image wit unique name
-    base64_image = data['image'][i]
+    base64_image = data[i]['image']
     image = Image.open(BytesIO(b64decode(base64_image)))
     image.save(os.path.join(IMAGE_DIR, f"{file_name}-{page_num}-{i}.png"))
 
     user_query = random.choice(randomized_user_prompt) + ' <img>' + os.path.join(IMAGE_DIR, f"{file_name}-{page_num}-{i}.png") + '</img>'
-    response = data['response'][i].strip()
+    response = data[i]['response'].strip()
     
     if '<img' not in response:
       qwen_data.append({
