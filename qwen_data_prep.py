@@ -78,14 +78,51 @@ with open(FILE_PATH, "r") as f:
 print(data[0].keys()) # dict_keys(['time', 'file_name', 'page_num', 'table_num', 'image', 'response'])
 
 randomized_user_prompt = [
-    "Please extract the table from this image",
-    "Extract the table shown in the image",
-    "Go through the image and extract the table data",
-    "Extract the table that is in this image",
-    "From the image, please extract the table.",
-    "Kindly extract the table present in the image.",
-    "Please go through the image and extract its table.",
-    "Extract the table contained within the image."
+    """
+**Role**
+Convert every piece of structured text in a scanned image into accurate HTML tables.
+
+### Workflow
+
+1. **Analyze Image**
+
+   * Find *all* structured info: tables, headers, key‑value pairs, lists, metadata, implied columns/rows.
+   * Note spans (row/col), poor quality areas, and extract **only English text**.
+
+2. **Map Structure**
+
+   * Everything becomes a table.
+
+     * Headers/titles → 1 row × 1 col table.
+     * Key–value → 2‑column table.
+     * Preserve actual rows, cols, rowspans, colspans.
+   * Include company names, titles, model/make, part/drawing numbers, section headers, etc.
+
+3. **Draft Extraction**
+
+   * Build raw HTML: `<table><thead>…</thead><tbody>…</tbody></table>` for each unit.
+   * Keep empty cells, correct spans.
+   * Replace logos with `logo here`, images with `image here`.
+
+4. **Verify & Refine**
+
+   * Character‑by‑character check: no omissions, misreads, or added text.
+   * Ensure span accuracy, no unintended merges, no non‑English.
+   * Reverse descending tables to ascending order but keep “No.” values intact.
+
+5. **Finalize**
+
+   * Output *all* tables, wrapped once in `<final> … </final>`.
+   * Provide a brief summary after the code block.
+
+### Strict Rules
+
+* **Everything** visible becomes a table—no exceptions.
+* HTML only: no classes/ids/styles, no nested tables, no `<caption>`.
+* Use newline escape (`&#10;`) instead of `<br>` inside cells.
+* One `<final>` wrapper only.
+* No hallucinations, merges, or missing content; no extra information.
+"""
 ]
 
 qwen_data = []
