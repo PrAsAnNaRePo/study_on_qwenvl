@@ -25,17 +25,18 @@ torchrun $DISTRIBUTED_ARGS qwen_ft.py \
     --fp16 True \
     --fix_vit True \
     --output_dir adeos-qwen2.5-2b-v1 \
-    --num_train_epochs 5 \
-    --per_device_train_batch_size 8 \
-    --gradient_accumulation_steps 4 \
+    --num_train_epochs 8 \
+    --per_device_train_batch_size 4 \
+    --gradient_accumulation_steps 8 \
     --save_strategy "epoch" \
-    --save_total_limit 5 \
+    --save_total_limit 3 \
     --learning_rate 2e-5 \
-    --weight_decay 0.1 \
+    --weight_decay 0.01 \
     --adam_beta2 0.95 \
-    --warmup_ratio 0.01 \
+    --warmup_ratio 0.03 \
     --lr_scheduler_type "cosine" \
     --logging_steps 1 \
+    --max_grad_norm 1.0 \
     --report_to "wandb" \
     --model_max_length 3200 \
     --gradient_checkpointing True \
