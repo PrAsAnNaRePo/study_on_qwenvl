@@ -56,6 +56,7 @@ here is the sample format to make:
 
 '''
 
+import argparse
 import json
 import os
 import sys
@@ -65,19 +66,25 @@ from io import BytesIO
 from base64 import b64decode
 import random
 
-FILE_PATH = "adeos-2562.json"
-IMAGE_DIR = "images"
+def main():
+    parser = argparse.ArgumentParser(description="Prepare data for Qwen fine-tuning")
+    parser.add_argument("input_file", help="Path to the input JSON file")
+    parser.add_argument("--image_dir", default="images", help="Directory to save images (default: images)")
+    args = parser.parse_args()
+    
+    FILE_PATH = args.input_file
+    IMAGE_DIR = args.image_dir
 
-if not os.path.exists(IMAGE_DIR):
-    os.makedirs(IMAGE_DIR)
+    if not os.path.exists(IMAGE_DIR):
+        os.makedirs(IMAGE_DIR)
 
-# load the dataset we have
-with open(FILE_PATH, "r") as f:
-    data = json.load(f)
+    # load the dataset we have
+    with open(FILE_PATH, "r") as f:
+        data = json.load(f)
 
-print(data[0].keys()) # dict_keys(['time', 'file_name', 'page_num', 'table_num', 'image', 'response'])
+    print(data[0].keys()) # dict_keys(['time', 'file_name', 'page_num', 'table_num', 'image', 'response'])
 
-randomized_user_prompt = [
+    randomized_user_prompt = [
     """
 **Role**
 Convert every piece of structured text in a scanned image into accurate HTML tables.
@@ -123,44 +130,48 @@ Convert every piece of structured text in a scanned image into accurate HTML tab
 * One `<final>` wrapper only.
 * No hallucinations, merges, or missing content; no extra information.
 """
-]
+    ]
 
-qwen_data = []
+    qwen_data = []
 
-data_idx = 0
+    data_idx = 0
 
-for i in tqdm(range(len(data))):
+    for i in tqdm(range(len(data))):
 
-    time = data[i]['time']
-    file_name = data[i]['file_name']
-    page_num = data[i]['page_num']
+        time = data[i]['time']
+        file_name = data[i]['file_name']
+        page_num = data[i]['page_num']
 
-    # save the image wit unique name
-    base64_image = data[i]['image']
-    image = Image.open(BytesIO(b64decode(base64_image)))
-    image.save(os.path.join(IMAGE_DIR, f"{file_name}-{page_num}-{i}.png"))
+        # save the image wit unique name
+        base64_image = data[i]['image']
+        image = Image.open(BytesIO(b64decode(base64_image)))
+        image.save(os.path.join(IMAGE_DIR, f"{file_name}-{page_num}-{i}.png"))
 
-    user_query = random.choice(randomized_user_prompt) + ' <img>' + os.path.join(IMAGE_DIR, f"{file_name}-{page_num}-{i}.png") + '</img>'
-    response = data[i]['response'].strip()
-    
-    if '<img' not in response:
-      qwen_data.append({
-          "id": f"identity_{data_idx}",
-          "conversations": [
-              {
-                  "from": "user",
-                  "value": user_query
-              },
-              {
-                  "from": "assistant",
-                  "value": response
-              }
-          ]
-      })
-      data_idx += 1
+        user_query = random.choice(randomized_user_prompt) + ' <img>' + os.path.join(IMAGE_DIR, f"{file_name}-{page_num}-{i}.png") + '</img>'
+        response = data[i]['response'].strip()
+        
+        if '<img' not in response:
+          qwen_data.append({
+              "id": f"identity_{data_idx}",
+              "conversations": [
+                  {
+                      "from": "user",
+                      "value": user_query
+                  },
+                  {
+                      "from": "assistant",
+                      "value": response
+                  }
+              ]
+          })
+          data_idx += 1
 
-print(qwen_data[0])
-print(len(qwen_data))
+    print(qwen_data[0])
+    print(len(qwen_data))
 
-with open("ft-"+FILE_PATH, "w") as f:
-    json.dump(qwen_data, f, indent=4)
+    output_file = f"ft-{os.path.basename(FILE_PATH)}"
+    with open(output_file, "w") as f:
+        json.dump(qwen_data, f, indent=4)
+
+if __name__ == "__main__":
+    main()

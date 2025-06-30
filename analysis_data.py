@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
 """
-Compute and print token count statistics for conversations in ft-adeos-2599.json using Qwen tokenizer.
+Compute and print token count statistics for conversations in JSON file using Qwen tokenizer.
 """
+import argparse
 import json
 import matplotlib.pyplot as plt
 
 def main():
+    parser = argparse.ArgumentParser(description="Analyze token count statistics for conversations in JSON file")
+    parser.add_argument("input_file", help="Path to the input JSON file")
+    args = parser.parse_args()
+    
     try:
-        with open("ft-adeos-2562.json", "r", encoding="utf-8") as f:
+        with open(args.input_file, "r", encoding="utf-8") as f:
             data = json.load(f)
     except FileNotFoundError:
-        print("Error: 'ft-adeos-2599.json' not found.")
+        print(f"Error: '{args.input_file}' not found.")
         return
     # Load Qwen tokenizer
     try:
